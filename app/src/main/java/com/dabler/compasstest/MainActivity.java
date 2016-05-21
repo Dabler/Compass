@@ -12,10 +12,20 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity implements CompassContract {
+import com.dabler.compasstest.Contracts.CompassContract;
+import com.dabler.compasstest.Contracts.CompassListenerContract;
+import com.dabler.compasstest.Contracts.CompassPresenterContract;
+import com.dabler.compasstest.Contracts.CompassViewContract;
+import com.dabler.compasstest.Contracts.LocationContract;
+import com.dabler.compasstest.Contracts.LocationListenerContract;
+import com.dabler.compasstest.Helpers.CompassHelper;
+import com.dabler.compasstest.Helpers.LocationHelper;
+import com.dabler.compasstest.Listeners.CompassListener;
+import com.dabler.compasstest.Listeners.LocationListener;
 
-    CompassHelper compassHelper;
-    LocationHelper locationHelper;
+public class MainActivity extends AppCompatActivity implements CompassViewContract {
+
+    private CompassPresenterContract compassPresenter;
 
     private TextView distanceTextView;
     private EditText longitudeEditText;
@@ -24,19 +34,12 @@ public class MainActivity extends AppCompatActivity implements CompassContract {
     private ImageView arrowView;
     private ImageView navigationArrow;
 
-    private float oldNavigationPosition = 0;
-    private float oldAzimuth = 0;
-
-    private boolean navigate = false;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Bind();
-        SensorManager mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
-        compassHelper = new CompassHelper(this, mSensorManager);
-        locationHelper = new LocationHelper(this);
+        new CompassPresenter(this, this);
     }
 
     private void adjustArrow(ImageView arrow, float oldValue, float newValue) {
@@ -65,8 +68,7 @@ public class MainActivity extends AppCompatActivity implements CompassContract {
                 String latitude = latitudeEditText.getText().toString();
                 String longitude = longitudeEditText.getText().toString();
                 try {
-                    locationHelper.SetDestinationLocation(Float.valueOf(latitude), Float.valueOf(longitude));
-                    navigate = true;
+                    compassPresenter.SetDestinationLocation(Float.valueOf(latitude), Float.valueOf(longitude));
                 }catch(NumberFormatException e) {
                     Toast.makeText(MainActivity.this, "Coordinates not entered", Toast.LENGTH_SHORT).show();
                 }
@@ -75,52 +77,54 @@ public class MainActivity extends AppCompatActivity implements CompassContract {
     }
 
     @Override
-    public void CompassChanged(float azimuth) {
-        adjustArrow(arrowView, oldAzimuth, azimuth);
-        oldAzimuth = azimuth;
-        if(navigate) {
-            if(!locationHelper.IsLocationAvailable())
-            {
-                navigate = false;
-                Toast.makeText(MainActivity.this, "Turn on GPS to continue", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            adjustArrow(navigationArrow, oldNavigationPosition, locationHelper.GetDegrees() - azimuth);
-            oldNavigationPosition = locationHelper.GetDegrees() - azimuth;
-            distanceTextView.setText("Distance left: "+String.format("%.2f", locationHelper.GetDistance()/1000)+" km");
-            if(locationHelper.GetDistance() < 0.10f){
-                navigate=false;
-                distanceTextView.setText("Destination target reached");
-            }
-        }
-    }
-
-    @Override
     public void onResume()
     {
         super.onResume();
-        compassHelper.ResumeCompass();
-        locationHelper.OnListenerResume();
+        compassPresenter.OnResume();
+        compassPresenter.start();
     }
 
     @Override
     public void onPause()
     {
         super.onPause();
-        compassHelper.PauseCompass();
-        locationHelper.OnListenerPause();
+        compassPresenter.OnPause();
     }
 
     @Override
     public void onStart(){
         super.onStart();
-        locationHelper.OnListenerStart();
+        compassPresenter.OnStart();
     }
 
     @Override
     public void onStop(){
         super.onStop();
-        locationHelper.OnListenerStop();
+        compassPresenter.OnStop();
     }
 
+    @Override
+    public void setPresenter(CompassPresenterContract presenter) {
+        compassPresenter = presenter;
+    }
+
+    @Override
+    public void AdjustCompassArrow(float oldPosition, float newPosition) {
+        adjustArrow(arrowView, oldPosition, newPosition);
+    }
+
+    @Override
+    public void AdjustNavigationArrow(float oldPosition, float newPosition) {
+        adjustArrow(navigationArrow, oldPosition, newPosition);
+    }
+
+    @Override
+    public void ShowInformation(String information) {
+        Toast.makeText(MainActivity.this, information, Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void SetDistanceInformation(String information) {
+        distanceTextView.setText(information);
+    }
 }
